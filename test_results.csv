@@ -1,0 +1,4 @@
+request_id,request_date,response,cash_balance
+1,2026-01-01,Orders placed successfully: 10 sheets of Cardstock for $1.50 and 20 sheets of Colored paper for $2.00.,49418.43
+2,2026-01-01,"Order confirmed for 100 units of Butcher paper. Total charged: $100.00. Delivery by April 15, 2026.",49518.43
+3,2026-01-01,"Order confirmed for 150 units of bright-colored paper and 500 units of butcher paper, to be delivered by April 15, 2026.",49518.43
