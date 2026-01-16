@@ -1,4 +1,7 @@
 request_id,request_date,response,cash_balance
-1,2026-01-01,Orders placed successfully: 10 sheets of Cardstock for $1.50 and 20 sheets of Colored paper for $2.00.,49418.43
-2,2026-01-01,"Order confirmed for 100 units of Butcher paper. Total charged: $100.00. Delivery by April 15, 2026.",49518.43
-3,2026-01-01,"Order confirmed for 150 units of bright-colored paper and 500 units of butcher paper, to be delivered by April 15, 2026.",49518.43
+1,2026-01-01,"Order Summary:
+- Cardstock: 10 sheets for a total of $1.50.
+- Colored Paper: 20 sheets for a total of $2.00.
+Note: Glossy paper is currently out of stock and could not be ordered.",49418.43
+2,2026-01-01,"Order confirmed for 100 sheets of Butcher paper. Total charged: $9.50. Delivery is scheduled by April 15, 2026.",49427.93
+3,2026-01-01,"Orders confirmed: 150 sheets of photo paper, 5000 sheets of A3 paper, and 500 reams of printer paper are scheduled for delivery by April 15, 2026.",49427.93
