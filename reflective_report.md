@@ -173,7 +173,6 @@ Parallel agent execution for higher throughput
 
 This project successfully demonstrates how a multi-agent system can be used to manage inventory, generate quotes, and complete transactions in a realistic business context. By combining the smolagents orchestration framework with a robust database backend, the system achieves accuracy, reliability, and scalability.
 
-<<<<<<< HEAD
 The modular agent-based design not only meets all project requirements but also provides a strong foundation for future expansion and real-world deployment.
 
 
@@ -197,6 +196,3 @@ This satisfies:
 ✔ Accuracy requirement
 ✔ Evidence-based reflection
 ✔ Alignment with generated output
-=======
-The modular agent-based design not only meets all project requirements but also provides a strong foundation for future expansion and real-world deployment.
->>>>>>> 913aba19a1ef0318d5ec1fd81dcc7c80bbb81006

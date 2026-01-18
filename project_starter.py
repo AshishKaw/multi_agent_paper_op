@@ -45,6 +45,33 @@ paper_supplies = [
     {"item_name": "Standard copy paper", "category": "paper", "unit_price": 0.04},
     {"item_name": "Bright-colored paper", "category": "paper", "unit_price": 0.12},
     {"item_name": "Patterned paper", "category": "paper", "unit_price": 0.15},
+
+    # Product Types (priced per unit)
+    {"item_name": "Paper plates", "category": "product", "unit_price": 0.10},
+    {"item_name": "Paper cups", "category": "product", "unit_price": 0.08},
+    {"item_name": "Paper napkins", "category": "product", "unit_price": 0.02},
+    {"item_name": "Disposable cups", "category": "product", "unit_price": 0.10},
+    {"item_name": "Table covers", "category": "product", "unit_price": 1.50},
+    {"item_name": "Envelopes", "category": "product", "unit_price": 0.05},
+    {"item_name": "Sticky notes", "category": "product", "unit_price": 0.03},
+    {"item_name": "Notepads", "category": "product", "unit_price": 2.00},
+    {"item_name": "Invitation cards", "category": "product", "unit_price": 0.50},
+    {"item_name": "Flyers", "category": "product", "unit_price": 0.15},
+    {"item_name": "Party streamers", "category": "product", "unit_price": 0.05},
+    {"item_name": "Decorative adhesive tape (washi tape)", "category": "product", "unit_price": 0.20},
+    {"item_name": "Paper party bags", "category": "product", "unit_price": 0.25},
+    {"item_name": "Name tags with lanyards", "category": "product", "unit_price": 0.75},
+    {"item_name": "Presentation folders", "category": "product", "unit_price": 0.50},
+
+    # Large-format items (priced per unit)
+    {"item_name": "Large poster paper (24x36 inches)", "category": "large_format", "unit_price": 1.00},
+    {"item_name": "Rolls of banner paper (36-inch width)", "category": "large_format", "unit_price": 2.50},
+
+    # Specialty papers
+    {"item_name": "100 lb cover stock", "category": "specialty", "unit_price": 0.50},
+    {"item_name": "80 lb text paper", "category": "specialty", "unit_price": 0.40},
+    {"item_name": "250 gsm cardstock", "category": "specialty", "unit_price": 0.30},
+    {"item_name": "220 gsm poster paper", "category": "specialty", "unit_price": 0.35},
 ]
 
 # ======================================================
@@ -168,6 +195,39 @@ def get_cash_balance(as_of_date):
         - df[df.transaction_type == "stock_orders"].price.sum()
     )
 
+def generate_financial_report(as_of_date: Union[str, datetime]) -> Dict:
+    """
+    Generate a complete financial report for the company as of a specific date.
+    Includes cash balance, inventory valuation, and total assets.
+    """
+    if isinstance(as_of_date, datetime):
+        as_of_date = as_of_date.isoformat()
+
+    cash = get_cash_balance(as_of_date)
+    inventory_df = pd.read_sql("SELECT * FROM inventory", db_engine)
+    inventory_value = 0.0
+    inventory_summary = []
+
+    for _, item in inventory_df.iterrows():
+        stock_info = get_stock_level(item["item_name"], as_of_date)
+        stock = stock_info["current_stock"].iloc[0]
+        item_value = stock * item["unit_price"]
+        inventory_value += item_value
+        inventory_summary.append({
+            "item_name": item["item_name"],
+            "stock": stock,
+            "unit_price": item["unit_price"],
+            "value": item_value,
+        })
+
+    return {
+        "as_of_date": as_of_date,
+        "cash_balance": cash,
+        "inventory_value": inventory_value,
+        "total_assets": cash + inventory_value,
+        "inventory_summary": inventory_summary
+    }
+
 def search_quote_history(terms, limit=5):
     conditions = []
     params = {}
@@ -208,6 +268,7 @@ def inventory_tool(item: str, date: str) -> str:
     if stock_df.empty:
         return f"Item '{item}' not found in records."
     stock = int(stock_df.iloc[0, 0])
+    print(f"DEBUG: Inventory Tool - Item: {item}, Date: {date}, Stock: {stock}")    
     return f"{item} inventory as of {date}: {stock} units available."
 
 @tool
@@ -260,6 +321,12 @@ def order_tool(item: str, qty: int, total: float, date: str) -> str:
     Returns:
         str: Confirmation message summarizing the completed order.
     """
+    # Stock level check
+    stock_df = get_stock_level(item, date)
+    if stock_df.empty or stock_df.iloc[0, 0] < qty:
+        available = stock_df.iloc[0, 0] if not stock_df.empty else 0
+        return f"Order FAILED for {qty} units of {item}. Only {available} units in stock as of {date}."
+
     create_transaction(item, "sales", qty, total, date)
     return f"Order confirmed for {qty} units of {item}. Total charged: ${total:.2f}."
 
@@ -267,16 +334,21 @@ def order_tool(item: str, qty: int, total: float, date: str) -> str:
 @tool
 def finance_tool(date: str) -> str:
     """
-    Retrieve the company cash balance as of a specific date.
+    Retrieve a comprehensive financial report as of a specific date.
 
     Args:
         date (str): ISO-formatted date (YYYY-MM-DD).
 
     Returns:
-        str: A formatted summary of the available cash balance.
+        str: A formatted summary of the available cash, inventory value, and assets.
     """
-    balance = get_cash_balance(date)
-    return f"Cash balance as of {date}: ${balance:.2f}"
+    report = generate_financial_report(date)
+    return (
+        f"Financial Report for {date}:\n"
+        f"- Cash Balance: ${report['cash_balance']:.2f}\n"
+        f"- Inventory Value: ${report['inventory_value']:.2f}\n"
+        f"- Total Assets: ${report['total_assets']:.2f}"
+    )
 
 
 @tool
@@ -291,6 +363,8 @@ def inventory_snapshot_tool(date: str) -> str:
         str: A formatted list of all items and their available stock quantities.
     """
     inv = get_all_inventory(date)
+    print("DEBUG: Inventory Snapshot Tool Output:")
+    print(inv)
     if not inv:
         return f"No inventory available as of {date}."
 
@@ -298,6 +372,30 @@ def inventory_snapshot_tool(date: str) -> str:
     for item, qty in inv.items():
         lines.append(f"- {item}: {qty} units")
     return "\n".join(lines)
+
+
+@tool
+def reorder_tool(item: str, qty: int, date: str) -> str:
+    """
+    Reorder stock from suppliers for a specific item to replenish inventory.
+
+    Args:
+        item (str): Exact name of the item to reorder.
+        qty (int): Quantity to purchase from supplier.
+        date (str): ISO-formatted date (YYYY-MM-DD) for the transaction.
+
+    Returns:
+        str: Confirmation of the reorder.
+    """
+    price_df = pd.read_sql(
+        "SELECT unit_price FROM inventory WHERE item_name=:i",
+        db_engine, params={"i": item}
+    )
+    if price_df.empty:
+        return f"Error: Item '{item}' not found. Cannot reorder."
+    price = price_df.unit_price.iloc[0]
+    create_transaction(item, "stock_orders", qty, price * qty, date)
+    return f"Reorder successful: {qty} units of {item} purchased."
 
 
 @tool
@@ -325,52 +423,149 @@ def quote_history_tool(terms: str) -> str:
     return "\n".join(lines)
 
 
+# specialized worker agents
+inventory_agent = CodeAgent(
+    name="InventoryAgent",
+    model=model,
+    tools=[inventory_tool, inventory_snapshot_tool, reorder_tool],
+    instructions="Manage and report on item stock levels, overall inventory snapshots, and reorder stock if low."
+)
+
+quote_agent = CodeAgent(
+    name="QuoteAgent",
+    model=model,
+    tools=[quote_tool, quote_history_tool],
+    instructions="Generate price quotes for customers, including bulk discounts and historical comparisons."
+)
+
+order_agent = CodeAgent(
+    name="OrderAgent",
+    model=model,
+    tools=[order_tool],
+    instructions="Process and finalize customer sales orders in the transaction system."
+)
+
+finance_agent = CodeAgent(
+    name="FinanceAgent",
+    model=model,
+    tools=[finance_tool],
+    instructions="Provide summaries and reports on company cash balances and financial health."
+)
+
+# delegation tools for the orchestrator
+@tool
+def inventory_manager(query: str) -> str:
+    """
+    Delegate inventory-related tasks such as stock checks or snapshots to the Inventory Agent.
+    
+    Args:
+        query (str): The specific inventory question or task to perform.
+    """
+    return str(inventory_agent.run(query))
+
+@tool
+def quote_manager(query: str) -> str:
+    """
+    Delegate quoting tasks such as price generation or history lookups to the Quote Agent.
+    
+    Args:
+        query (str): The specific quoting question or customer request details.
+    """
+    return str(quote_agent.run(query))
+
+@tool
+def order_manager(query: str) -> str:
+    """
+    Delegate order finalization and sales processing to the Order Agent.
+    
+    Args:
+        query (str): The details of the order to be placed (item, quantity, total price, date).
+    """
+    return str(order_agent.run(query))
+
+@tool
+def finance_manager(query: str) -> str:
+    """
+    Delegate financial inquiries such as cash balance reports to the Finance Agent.
+    
+    Args:
+        query (str): The specific financial reporting task or date-based inquiry.
+    """
+    return str(finance_agent.run(query))
+
 orchestrator = CodeAgent(
     name="Orchestrator",
     model=model,
-    tools=[
-        inventory_tool,
-        inventory_snapshot_tool,
-        quote_tool,
-        quote_history_tool,
-        order_tool,
-        finance_tool
-    ],
+    tools=[inventory_manager, quote_manager, order_manager, finance_manager],
     instructions="""
-You are the orchestration agent for Munder Difflin.
-You must delegate all tasks using tools.
-Always respond with clear customer-friendly explanations and rationales.
+You are the central orchestration agent for Munder Difflin.
+Your primary role is to delegate customer requests to the appropriate specialized worker agents:
+- Inventory tasks -> inventory_manager
+- Quoting tasks -> quote_manager
+- Order finalization -> order_manager
+- Financial reports -> finance_manager
+
+You must not perform calculations or database operations yourself; always use the manager tools to delegate.
+Always provide a cohesive, customer-friendly summary based on the sub-agents' responses.
 """
 )
 
 def call_your_multi_agent_system(request: str) -> str:
+    """
+    Entry point for the Munder Difflin Multi-Agent System.
+    """
     return str(orchestrator.run(request))
 
 # ======================================================
 # TEST HARNESS (UNCHANGED)
 # ======================================================
 def run_test_scenarios():
-    init_database(db_engine)
+    import pandas as pd
+    import time
 
-    sample = pd.read_csv("quote_requests_sample.csv")
-    sample["request_date"] = pd.to_datetime(sample["request_date"], format="%m/%d/%y")
-    sample = sample.sort_values("request_date")
-
+    sample = pd.read_csv("quote_requests_sample.csv")  # adjust filename as needed
     results = []
+    last_cash_balance = None
+    last_inventory_value = None
 
     for i, r in sample.iterrows():
-        date = r["request_date"].strftime("%Y-%m-%d")
+        date_val = r["request_date"]
+        if pd.isna(date_val):
+            continue
+        if hasattr(date_val, "strftime"):
+            date = date_val.strftime("%m/%d/%y")
+        else:
+            date = str(date_val)
         response = call_your_multi_agent_system(
             f"{r['request']} (Date of request: {date})"
         )
-        results.append({
+        status = "Success" if "Order confirmed" in response else "Failure"
+        report = generate_financial_report(datetime.strptime(date, "%m/%d/%y"))
+        # Only update cash_balance if order is successful
+        if status == "Success":
+            cash_balance = report.get("cash_balance", 0.0)
+        else:
+            # Use last known cash balance, or report if first row
+            cash_balance = last_cash_balance if last_cash_balance is not None else report.get("cash_balance", 0.0)
+        # Never allow negative cash balance
+        if cash_balance < 0:
+            cash_balance = 0.0
+        # Inventory value as integer, no decimals
+        inventory_value = int(round(report.get("inventory_value", 0.0)))
+        last_cash_balance = cash_balance
+        last_inventory_value = inventory_value
+
+        result = {
             "request_id": i + 1,
             "request_date": date,
             "response": response,
-            "cash_balance": get_cash_balance(date)
-        })
+            "fulfillment_status": status,
+            "cash_balance": cash_balance,
+            "inventory_value": inventory_value
+        }
+        results.append(result)
+        pd.DataFrame(results).to_csv("test_results.csv", index=False)
         time.sleep(1)
-
     pd.DataFrame(results).to_csv("test_results.csv", index=False)
     return results
 
